@@ -4,6 +4,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+import random
+
 class Encoder(nn.Module):
     def __init__(self, input_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout):
         super().__init__()
