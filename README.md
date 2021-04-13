@@ -78,7 +78,9 @@ def train(model, iterator, optimizer, criterion, clip):
         
         loss = criterion(torch.log(output), trg)
         
-        loss_with_coverage = loss + repetition
+        alpha = 0.2 if loss < 1.66 else 1 if loss < 1.8 else 0
+		
+        loss_with_coverage = loss + repetition * alpha
         
         loss_with_coverage.backward()
         
