@@ -238,13 +238,23 @@ class Seq2Seq(nn.Module):
         coverage = Variable(torch.zeros(mask.shape)).to(self.device)
 
         #coverage = [batch size, src len]
+        
+        repetition = Variable(torch.tensor(0.)).to(self.device)
+        
+        #repetition = [batch size]
 
         for t in range(1, trg_len):
             
             #insert input token embedding, previous hidden state, all encoder hidden states 
             #  and mask
             #receive output tensor (predictions) and new hidden state
-            output, hidden, coverage, _, _ = self.decoder(input, hidden, encoder_outputs, mask, coverage, src)
+            output, hidden, next_coverage, attention, _ = self.decoder(input, hidden, encoder_outputs, mask, coverage, src)
+            
+            #next_coverage = [batch size, src len]
+            
+            repetition += torch.sum(torch.min(attention, coverage)) / coverage.shape[0]
+            
+            coverage = next_coverage
             
             #place predictions in a tensor holding predictions for each token
             outputs[t] = output
@@ -259,4 +269,4 @@ class Seq2Seq(nn.Module):
             #if not, use predicted token
             input = trg[t] if teacher_force else top1
             
-        return outputs
+        return outputs, repetition / trg_len
