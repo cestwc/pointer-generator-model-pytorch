@@ -2,8 +2,6 @@
 
 This is a pointer-generator network model built with PyTorch. Yes, you noticed that the entire format is extremely close to this [Tutorial](https://github.com/bentrevett/pytorch-seq2seq/blob/master/4%20-%20Packed%20Padded%20Sequences%2C%20Masking%2C%20Inference%20and%20BLEU.ipynb). We modified only the necessary parts to add the pointer mechanism and coverage according to the original [paper](https://www.aclweb.org/anthology/P17-1099/).
 
-One of the difference is that coverage is not explicitly calculated as loss, though we found that this model already works well. (I won't tell you it was actually because I don't know where to add it. Tell me if you happen to find it. Thanks!)
-
 To use this code, we sincerely recommend you to take a look at this [Tutorial](https://github.com/bentrevett/pytorch-seq2seq/blob/master/4%20-%20Packed%20Padded%20Sequences%2C%20Masking%2C%20Inference%20and%20BLEU.ipynb). You can just import the model and replace the one in the tutorial.
 
 As everyone may have their own application with this model, we would not publish a separate file for the usage, but rather paste it here. This usage is also very similar to the format you saw in the tutorial just now. One **BIG** difference you need to notice is that the original ```Field``` class instances are not enough to handle out-of-vocabulary words, and thus all that you need to do is to put the ```oov.py``` file from [here](https://cestwc.medium.com/how-do-you-write-a-clean-pointer-generator-model-with-pytorch-80d25bde113b) into the directory where your codes are running. You can assume this ```oov.py``` as a patch to standard Torchtext 0.9.1, till the day newer versions emerge. Another **difference** is that the loss function has to be the negative log likelihood loss, as the last layer from ```Decoder``` is already in a form of probablity (which you need to ```torch.log``` is later before calculating the loss).
@@ -15,10 +13,10 @@ from model import Attention, Encoder, Decoder, Seq2Seq
 
 INPUT_DIM = len(YOUR_SRC_FIELD.vocab)
 OUTPUT_DIM = len(YOUR_TRG_FIELD.vocab)
-ENC_EMB_DIM = 256
-DEC_EMB_DIM = 256
-ENC_HID_DIM = 512
-DEC_HID_DIM = 512
+ENC_EMB_DIM = 128
+DEC_EMB_DIM = 128
+ENC_HID_DIM = 256
+DEC_HID_DIM = 256
 ENC_DROPOUT = 0.5
 DEC_DROPOUT = 0.5
 SRC_PAD_IDX = SRC.vocab.stoi[SRC.pad_token]
@@ -65,7 +63,7 @@ def train(model, iterator, optimizer, criterion, clip):
         
         optimizer.zero_grad()
         
-        output = model(src, src_len, trg)
+        output, repetition = model(src, src_len, trg)
         
         #trg = [trg len, batch size]
         #output = [trg len, batch size, output dim]
@@ -80,7 +78,9 @@ def train(model, iterator, optimizer, criterion, clip):
         
         loss = criterion(torch.log(output), trg)
         
-        loss.backward()
+        loss_with_coverage = loss + repetition
+        
+        loss_with_coverage.backward()
         
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
         
@@ -103,7 +103,7 @@ def evaluate(model, iterator, criterion):
             src, src_len = batch.src
             trg = batch.trg
 
-            output = model(src, src_len, trg, 0) #turn off teacher forcing
+            output, _ = model(src, src_len, trg, 0) #turn off teacher forcing
             
             #trg = [trg len, batch size]
             #output = [trg len, batch size, output dim]
